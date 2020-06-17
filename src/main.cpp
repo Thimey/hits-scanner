@@ -1,6 +1,4 @@
 #include <Arduino.h>
-
-#include "secrets.h"
 #include <WiFiClientSecure.h>
 #include <MQTTClient.h>
 #include <ArduinoJson.h>
@@ -10,6 +8,10 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+
+#include "secrets.h"
+#include "./Buzzer/Buzzer.h"
+
 
 // OLED dfinitions
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
@@ -29,7 +31,7 @@
 #define RST_PIN         LED_BUILTIN          // Configurable, see typical pin layout above
 #define SS_PIN          5         // Configurable, see typical pin layout above
 
-#define BUZZER_PIN      4
+Buzzer buzzer(4);
 
 WiFiClientSecure net = WiFiClientSecure();
 
@@ -53,22 +55,6 @@ void oledPrintMessage(String message) {
   display.setCursor(0,0);             // Start at top-left corner
   display.println(message);
   display.display();
-}
-
-void tone(byte pin, int freq) {
-  ledcSetup(0, 2000, 8); // setup beeper
-  ledcAttachPin(pin, 0); // attach beeper
-  ledcWriteTone(0, freq); // play tone
-}
-
-void noTone() {
-  tone(0, 0);
-}
-
-void beep() {
-  tone(BUZZER_PIN, 2000);
-  delay(300);
-  noTone();
 }
 
 void connectWiFi() {
@@ -125,7 +111,7 @@ void publishScan(String uid) {
 
 //  client.publish("$aws/things/Hits_Scanner/shadow/get", "");
   client.publish(AWS_IOT_SCAN_TOPIC, jsonBuffer);
-  beep();
+  buzzer.beep();
   oledPrintMessage("Scanned: " + uid);
 }
 
@@ -201,12 +187,12 @@ void loop() {
   }
 
 	// Reset the loop if no new card present on the sensor/reader. This saves the entire process when idle.
-	if ( ! rfid.PICC_IsNewCardPresent()) {
+	if (!rfid.PICC_IsNewCardPresent()) {
 		return;
 	}
 
 	// Select one of the cards
-	if ( ! rfid.PICC_ReadCardSerial()) {
+	if (!rfid.PICC_ReadCardSerial()) {
 		return;
 	}
 
