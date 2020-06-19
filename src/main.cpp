@@ -11,14 +11,7 @@
 
 #include "secrets.h"
 #include "./Buzzer/Buzzer.h"
-
-
-// OLED dfinitions
-#define SCREEN_WIDTH 128 // OLED display width, in pixels
-#define SCREEN_HEIGHT 64 // OLED display height, in pixels
-// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
-#define OLED_RESET     LED_BUILTIN // Reset pin # (or -1 if sharing Arduino reset pin)
-
+#include "./Screen/Screen.h"
 
 // The MQTT topics that this device should publish/subscribe
 #define AWS_IOT_SCAN_TOPIC   "hitsScanner/scan"
@@ -32,13 +25,12 @@
 #define SS_PIN          5         // Configurable, see typical pin layout above
 
 Buzzer buzzer(4);
+Screen screen;
 
 WiFiClientSecure net = WiFiClientSecure();
 
 
 MQTTClient client = MQTTClient(256);
-
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 // Init array that will store new NUID
 byte nuidPICC[4];
@@ -48,21 +40,12 @@ unsigned long lastMillis = 0;
 
 MFRC522 rfid(SS_PIN, RST_PIN);  // Create MFRC522 instance
 
-void oledPrintMessage(String message) {
-  display.clearDisplay();
-  display.setTextSize(1);             // Normal 1:1 pixel scale
-  display.setTextColor(SSD1306_WHITE);        // Draw white text
-  display.setCursor(0,0);             // Start at top-left corner
-  display.println(message);
-  display.display();
-}
-
 void connectWiFi() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   Serial.println("Connecting to Wi-Fi");
-  oledPrintMessage("Connecting to WiFi...");
+  screen.printMessage("Connecting to WiFi...");
 
   while (WiFi.status() != WL_CONNECTED){
     delay(500);
@@ -72,7 +55,7 @@ void connectWiFi() {
 
 void connectAWS() {
   Serial.print("Connecting to AWS IOT");
-  oledPrintMessage("Connecting to AWS...");
+  screen.printMessage("Connecting to AWS...");
 
   while (!client.connect(THINGNAME)) {
     Serial.print(".");
@@ -92,11 +75,10 @@ void connectAWS() {
 //  client.subscribe("$aws/things/Hits_Scanner/shadow/get/accepted");
 //  client.subscribe("$aws/things/Hits_Scanner/shadow/get/rejected");
   client.subscribe("$aws/things/Hits_Scanner/shadow/update/documents");
-//  client.subscribe("/hello");
 
   Serial.println("AWS IoT Connected!");
 
-  oledPrintMessage("AWS IoT Connected!");
+  screen.printMessage("AWS IoT Connected!");
 }
 
 void publishScan(String uid) {
@@ -112,7 +94,7 @@ void publishScan(String uid) {
 //  client.publish("$aws/things/Hits_Scanner/shadow/get", "");
   client.publish(AWS_IOT_SCAN_TOPIC, jsonBuffer);
   buzzer.beep();
-  oledPrintMessage("Scanned: " + uid);
+  screen.printMessage("Scanned: " + uid);
 }
 
 void messageHandler(String &topic, String &payload) {
@@ -137,17 +119,14 @@ String getUIDString(byte *buffer, byte bufferSize) {
 
 void setup() {
   Serial.begin(9600);
-  // Init SPI bus
   SPI.begin();
 
-  // Init OLED screen
-  // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
-  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+  if (!screen.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
     Serial.println(F("SSD1306 allocation failed"));
     for(;;); // Don't proceed, loop forever
   }
 
-  oledPrintMessage("Initialising...");
+  screen.printMessage("Initialising...");
 
   // Init rfid reader
   rfid.PCD_Init();

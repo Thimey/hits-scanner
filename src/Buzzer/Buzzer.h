@@ -1,4 +1,3 @@
-
 class Buzzer
 {
     private:
