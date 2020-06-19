@@ -5,9 +5,8 @@
 
 
 Screen::Screen(int screenWidth, int screenHeight, TwoWire *twoWire, int resetPin)
-    : Adafruit_SSD1306(screenWidth, screenHeight, twoWire, resetPin) {
-
-}
+    : Adafruit_SSD1306(screenWidth, screenHeight, twoWire, resetPin)
+{}
 
 void Screen::printMessage(String message)
 {

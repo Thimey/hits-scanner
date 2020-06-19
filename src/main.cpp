@@ -119,20 +119,20 @@ String getUIDString(byte *buffer, byte bufferSize) {
 
 void setup() {
   Serial.begin(9600);
+
+  // Initialise SPI BUS
   SPI.begin();
 
-  if (!screen.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-    Serial.println(F("SSD1306 allocation failed"));
-    for(;;); // Don't proceed, loop forever
-  }
-
+  // Initialise OLED screen
+  screen.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   screen.printMessage("Initialising...");
 
-  // Init rfid reader
+  // Initialise rfid reader
   rfid.PCD_Init();
-  delay(4);        // Optional delay. Some board do need more time after init to be ready, see Readme
-  rfid.PCD_DumpVersionToSerial();  // Show details of PCD - MFRC522 Card Reader details
+  delay(4);
+  rfid.PCD_DumpVersionToSerial();
 
+  // Connect to the configured WiFi
   connectWiFi();
 
   // Configure WiFiClientSecure to use the AWS IoT device credentials
@@ -140,12 +140,13 @@ void setup() {
   net.setCertificate(AWS_CERT_CRT);
   net.setPrivateKey(AWS_CERT_PRIVATE);
 
-  // Connect to the MQTT broker on the AWS endpoint we defined earlier
+  // Connect to the MQTT broker to AWS endpoint for Thing
   client.begin(AWS_IOT_ENDPOINT, 8883, net);
 
   // Create a message handler
   client.onMessage(messageHandler);
 
+  // Connect device to AWS iot
   connectAWS();
 }
 
@@ -186,5 +187,6 @@ void loop() {
   // Stop encryption on PCD
   rfid.PCD_StopCrypto1();
 
+  // Add a small delay to prevent scans in quick successions
   delay(1000);
 }
