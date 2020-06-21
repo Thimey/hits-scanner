@@ -3,8 +3,7 @@
 
 Buzzer::Buzzer(int pin) : pin(pin) {}
 
-void Buzzer::tone(int freq)
-{
+void Buzzer::tone(int freq) {
     // setup beeper
     ledcSetup(0, 2000, 8);
     // attach beeper
@@ -13,13 +12,11 @@ void Buzzer::tone(int freq)
     ledcWriteTone(0, freq);
 };
 
-void Buzzer::noTone()
-{
+void Buzzer::noTone() {
     tone(0);
 };
 
-void Buzzer::beep()
-{
+void Buzzer::beep() {
     tone(2000);
     delay(300);
     noTone();

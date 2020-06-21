@@ -14,22 +14,23 @@
 #include "./Screen/Screen.h"
 
 // The MQTT topics that this device should publish/subscribe
-#define AWS_IOT_SCAN_TOPIC   "hitsScanner/scan"
-#define AWS_IOT_SHADOW_UPDATE "$aws/things/Hits_Scanner/shadow/update"
-#define AWS_IOT_SHADOW_UPDATE_DELTA "$aws/things/Hits_Scanner/shadow/update/delta"
-#define AWS_IOT_SHADOW_UPDATE_ACCEPTED "$aws/things/Hits_Scanner/shadow/update/accepted"
-#define AWS_IOT_SHADOW_UPDATE_REJECTED "$aws/things/Hits_Scanner/shadow/update/rejected"
+#define CARD_SCAN_PUB_TOPIC "hitsScanner/scan"
+#define SCREEN_DISPLAY_SUB_TOPIC "hitsScanner/screenDisplay"
 
-// RFID Config
-#define RST_PIN         LED_BUILTIN          // Configurable, see typical pin layout above
-#define SS_PIN          5         // Configurable, see typical pin layout above
+// Pin configuration
+#define RFID_RST_PIN LED_BUILTIN
+#define RFID_SS_PIN 5
+#define BUZZER_DEFAULT_DATA_PIN 4
 
-Buzzer buzzer(4);
+// Buzzer
+Buzzer buzzer(BUZZER_DEFAULT_DATA_PIN);
+// OLED screen
 Screen screen;
-
+// RFID reader
+MFRC522 rfid(RFID_SS_PIN, RFID_RST_PIN);
+// WiFi client
 WiFiClientSecure net = WiFiClientSecure();
-
-
+// MQTT client
 MQTTClient client = MQTTClient(256);
 
 // Init array that will store new NUID
@@ -37,63 +38,59 @@ byte nuidPICC[4];
 
 unsigned long lastMillis = 0;
 
-
-MFRC522 rfid(SS_PIN, RST_PIN);  // Create MFRC522 instance
-
 void connectWiFi() {
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-  Serial.println("Connecting to Wi-Fi");
-  screen.printMessage("Connecting to WiFi...");
+    Serial.println("Connecting to Wi-Fi");
+    screen.printMessage("Connecting to WiFi...");
 
-  while (WiFi.status() != WL_CONNECTED){
-    delay(500);
-    Serial.print(".");
-  }
+    while (WiFi.status() != WL_CONNECTED){
+        delay(500);
+        Serial.print(".");
+    }
 }
 
 void connectAWS() {
-  Serial.print("Connecting to AWS IOT");
-  screen.printMessage("Connecting to AWS...");
+    Serial.print("Connecting to AWS IOT");
+    screen.printMessage("Connecting to AWS...");
 
-  while (!client.connect(THINGNAME)) {
-    Serial.print(".");
-    delay(1000);
-  }
+    while (!client.connect(THINGNAME)) {
+        Serial.print(".");
+        delay(1000);
+    }
 
-  if(!client.connected()){
-    Serial.println("AWS IoT Timeout!");
-    return;
-  }
+    if(!client.connected()){
+        Serial.println("AWS IoT Timeout!");
+        return;
+    }
 
-  // Subscribe to a topic
-  client.subscribe("hitsScanner/display");
+    // Subscribe to screen update topic
+    client.subscribe(SCREEN_DISPLAY_SUB_TOPIC);
 
-  Serial.println("AWS IoT Connected!");
-
-  screen.printMessage("AWS IoT Connected!");
+    Serial.println("AWS IoT Connected!");
+    screen.printMessage("AWS IoT Connected!");
 }
 
 void publishScan(String uid) {
+    Serial.println(uid);
+    StaticJsonDocument<200> doc;
+    doc["uid"] = uid;
+    doc["time"] = millis();
+    char jsonBuffer[512];
 
-  Serial.println(uid);
-  StaticJsonDocument<200> doc;
-  doc["uid"] = uid;
-  doc["time"] = millis();
-  char jsonBuffer[512];
+    serializeJson(doc, jsonBuffer); // print to client
 
-  serializeJson(doc, jsonBuffer); // print to client
-
-//  client.publish("$aws/things/Hits_Scanner/shadow/get", "");
-  client.publish(AWS_IOT_SCAN_TOPIC, jsonBuffer);
-  buzzer.beep();
-  screen.printMessage("Scanned: " + uid);
+    client.publish(CARD_SCAN_PUB_TOPIC, jsonBuffer);
+    buzzer.beep();
+    screen.printMessage("Scanned: " + uid);
 }
 
 void messageHandler(String &topic, String &payload) {
   Serial.println("incoming message...");
-//  Serial.println("incoming: " + topic + " - " + payload);
+  Serial.println("incoming: " + topic + " - " + payload);
+
+  screen.printMessage(payload);
 
 //  StaticJsonDocument<200> doc;
 //  deserializeJson(doc, payload);
@@ -101,86 +98,86 @@ void messageHandler(String &topic, String &payload) {
 }
 
 String getUIDString(byte *buffer, byte bufferSize) {
-  String uidString = "";
+    String uidString = "";
 
-  for (byte i = 0; i < bufferSize; i++) {
-    uidString += buffer[i] < 0x10 ? " 0" : " ";
-    uidString += buffer[i];
-  }
+    for (byte i = 0; i < bufferSize; i++) {
+        uidString += buffer[i] < 0x10 ? " 0" : " ";
+        uidString += buffer[i];
+    }
 
-  return uidString;
+    return uidString;
 }
 
 void setup() {
-  Serial.begin(9600);
+    Serial.begin(9600);
 
-  // Initialise SPI BUS
-  SPI.begin();
+    // Initialise SPI BUS
+    SPI.begin();
 
-  // Initialise OLED screen
-  screen.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-  screen.printMessage("Initialising...");
+    // Initialise OLED screen
+    screen.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+    screen.printMessage("Initialising...");
 
-  // Initialise rfid reader
-  rfid.PCD_Init();
-  delay(4);
-  rfid.PCD_DumpVersionToSerial();
+    // Initialise rfid reader
+    rfid.PCD_Init();
+    delay(4);
+    rfid.PCD_DumpVersionToSerial();
 
-  // Connect to the configured WiFi
-  connectWiFi();
+    // Connect to the configured WiFi
+    connectWiFi();
 
-  // Configure WiFiClientSecure to use the AWS IoT device credentials
-  net.setCACert(AWS_CERT_CA);
-  net.setCertificate(AWS_CERT_CRT);
-  net.setPrivateKey(AWS_CERT_PRIVATE);
+    // Configure WiFiClientSecure to use the AWS IoT device credentials
+    net.setCACert(AWS_CERT_CA);
+    net.setCertificate(AWS_CERT_CRT);
+    net.setPrivateKey(AWS_CERT_PRIVATE);
 
-  // Connect to the MQTT broker to AWS endpoint for Thing
-  client.begin(AWS_IOT_ENDPOINT, 8883, net);
+    // Connect to the MQTT broker to AWS endpoint for Thing
+    client.begin(AWS_IOT_ENDPOINT, 8883, net);
 
-  // Create a message handler
-  client.onMessage(messageHandler);
+    // Create a message handler
+    client.onMessage(messageHandler);
 
-  // Connect device to AWS iot
-  connectAWS();
+    // Connect device to AWS iot
+    connectAWS();
 }
 
 void loop() {
-  // Maintain a connection to the server
-  client.loop();
-  delay(500);
+    // Maintain a connection to the server
+    client.loop();
+    delay(500);
 
-  if (!client.connected()) {
-    Serial.println(F("Lost connection, reconnecting..."));
-    connectAWS();
-  }
+    if (!client.connected()) {
+        Serial.println(F("Lost connection, reconnecting..."));
+        connectAWS();
+    }
 
-  // publish a message roughly every second.
-  if (millis() - lastMillis > 1000) {
-    lastMillis = millis();
-    client.publish("/hello", "world");
-  }
+    // publish a message roughly every second.
+    if (millis() - lastMillis > 1000) {
+        lastMillis = millis();
+        client.publish("/hello", "world");
+    }
 
-	// Reset the loop if no new card present on the sensor/reader. This saves the entire process when idle.
-	if (!rfid.PICC_IsNewCardPresent()) {
-		return;
-	}
+        // Reset the loop if no new card present on the sensor/reader. This saves the entire process when idle.
+        if (!rfid.PICC_IsNewCardPresent()) {
+            return;
+        }
 
-	// Select one of the cards
-	if (!rfid.PICC_ReadCardSerial()) {
-		return;
-	}
+        // Select one of the cards
+        if (!rfid.PICC_ReadCardSerial()) {
+            return;
+        }
 
-  /* Continue if successful card read... */
+    /* Continue if successful card read... */
 
-  //  Publish card read event
-  publishScan(getUIDString(rfid.uid.uidByte, rfid.uid.size));
+    //  Publish card read event
+    publishScan(getUIDString(rfid.uid.uidByte, rfid.uid.size));
 
-  // Halt PICC
-  rfid.PICC_HaltA();
+    // Halt PICC
+    rfid.PICC_HaltA();
 
-  // Stop encryption on PCD
-  rfid.PCD_StopCrypto1();
+    // Stop encryption on PCD
+    rfid.PCD_StopCrypto1();
 
-  // Add a small delay to prevent scans in quick successions
-  delay(1000);
+    // Add a small delay to prevent scans in quick successions
+    delay(1000);
 }

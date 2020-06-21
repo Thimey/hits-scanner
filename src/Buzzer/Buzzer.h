@@ -1,5 +1,4 @@
-class Buzzer
-{
+class Buzzer {
     private:
         int pin;
         void tone(int freq);
