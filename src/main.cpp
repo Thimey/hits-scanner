@@ -68,13 +68,7 @@ void connectAWS() {
   }
 
   // Subscribe to a topic
-//  client.subscribe(AWS_IOT_SHADOW_UPDATE);
-//  client.subscribe(AWS_IOT_SHADOW_UPDATE_DELTA);
-//  client.subscribe(AWS_IOT_SHADOW_UPDATE_ACCEPTED);
-//  client.subscribe(AWS_IOT_SHADOW_UPDATE_REJECTED);
-//  client.subscribe("$aws/things/Hits_Scanner/shadow/get/accepted");
-//  client.subscribe("$aws/things/Hits_Scanner/shadow/get/rejected");
-  client.subscribe("$aws/things/Hits_Scanner/shadow/update/documents");
+  client.subscribe("hitsScanner/display");
 
   Serial.println("AWS IoT Connected!");
 
