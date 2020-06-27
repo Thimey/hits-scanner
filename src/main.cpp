@@ -2,16 +2,16 @@
 #include <WiFiClientSecure.h>
 #include <MQTTClient.h>
 #include <ArduinoJson.h>
-#include "WiFi.h"
-#include <SPI.h>
+#include <WiFi.h>
+#include <HTTPClient.h>
 #include <MFRC522.h>
+#include <SPI.h>
 #include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
 
 #include "secrets.h"
 #include "./Buzzer/Buzzer.h"
 #include "./Screen/Screen.h"
+#include "./Scanner/Scanner.h"
 
 // The MQTT topics that this device should publish/subscribe
 #define CARD_SCAN_PUB_TOPIC "hitsScanner/scan"
@@ -27,7 +27,7 @@ Buzzer buzzer(BUZZER_DEFAULT_DATA_PIN);
 // OLED screen
 Screen screen;
 // RFID reader
-MFRC522 rfid(RFID_SS_PIN, RFID_RST_PIN);
+Scanner scanner(RFID_SS_PIN, RFID_RST_PIN);
 // WiFi client
 WiFiClientSecure net = WiFiClientSecure();
 // MQTT client
@@ -119,9 +119,9 @@ void setup() {
     screen.printMessage("Initialising...");
 
     // Initialise rfid reader
-    rfid.PCD_Init();
+    scanner.PCD_Init();
     delay(4);
-    rfid.PCD_DumpVersionToSerial();
+    scanner.PCD_DumpVersionToSerial();
 
     // Connect to the configured WiFi
     connectWiFi();
@@ -157,26 +157,26 @@ void loop() {
         client.publish("/hello", "world");
     }
 
-        // Reset the loop if no new card present on the sensor/reader. This saves the entire process when idle.
-        if (!rfid.PICC_IsNewCardPresent()) {
-            return;
-        }
+    // Reset the loop if no new card present on the sensor/reader. This saves the entire process when idle.
+    if (!scanner.PICC_IsNewCardPresent()) {
+        return;
+    }
 
-        // Select one of the cards
-        if (!rfid.PICC_ReadCardSerial()) {
-            return;
-        }
+    // Select one of the cards
+    if (!scanner.PICC_ReadCardSerial()) {
+        return;
+    }
 
     /* Continue if successful card read... */
 
     //  Publish card read event
-    publishScan(getUIDString(rfid.uid.uidByte, rfid.uid.size));
+    publishScan(getUIDString(scanner.uid.uidByte, scanner.uid.size));
 
     // Halt PICC
-    rfid.PICC_HaltA();
+    scanner.PICC_HaltA();
 
     // Stop encryption on PCD
-    rfid.PCD_StopCrypto1();
+    scanner.PCD_StopCrypto1();
 
     // Add a small delay to prevent scans in quick successions
     delay(1000);
